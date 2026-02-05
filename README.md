@@ -10,6 +10,9 @@ Installation of PXE booting, DHCP, Ansible, or Nginx is not covered in this docu
 
 Requirements
 ------------
+##### Proxmox
+- Account to provision must have the PVEAdmin and Sys.Modify privileges
+
 ##### Services
 | Service | Type | Notes |
 |:---|:---|:---|
