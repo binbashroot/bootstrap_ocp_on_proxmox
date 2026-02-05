@@ -219,7 +219,7 @@ proxmox_disk_discard: ignore
 proxmox_disk_format: qcow2
 proxmox_disk_size: 200
 proxmox_numa: yes
-proxmox_ram: 81920
+proxmox_ram: 82944
 proxmox_storage: proxmox_nvme
 proxmox_tags:
   - ocp
@@ -287,6 +287,11 @@ ansible-playbook boostrap_ocp_cluster.yml
 # To destroy a cluster 
 ansible-playbook boostrap_ocp_cluster.yml -t never
 ````
+
+Known Bugs
+-------
+Using hotplug for memory has issues. You may need to increase the assigned memory by 1G when calculating. E.g. 1024 * 80 = 81920, but you have to bump it by a 1G to 82944 for hotplug to work with VM provisioning. This is a proxmox issue.
+
 
 License
 -------
