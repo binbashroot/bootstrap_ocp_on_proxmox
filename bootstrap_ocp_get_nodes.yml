@@ -1,0 +1,15 @@
+---
+
+- name: Get oc nodes
+  ansible.builtin.shell: |
+    set -o pipefail
+    oc get nodes
+  register: __ocp_nodes
+  changed_when: false
+
+- name: Print online nodes
+  ansible.builtin.debug:
+    msg:
+      - "{{ __ocp_nodes['stdout_lines'] }}"
+
+...

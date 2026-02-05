@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: custom-ingress-certs
+  namespace: openshift-ingress
+type: kubernetes.io/tls
+# Your custom cert and key must be converted to a base64 string
+data:
+  # cat my.crt | base64 -w 0
+  tls.crt: REPLACE_WITH_BASE64_STRING
+  # cat my.key | base64 -w 0
+  tls.key: REPLACE_WITH_BASE64_STRING
+
+...

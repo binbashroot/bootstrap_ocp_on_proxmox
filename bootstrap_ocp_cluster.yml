@@ -1,0 +1,259 @@
+---
+- name: Provision OCP Cluster
+  hosts: bootstrap,controlnodes,workernodes
+  gather_facts: false
+  vars:
+    proxmox_vm_name: "{{ inventory_hostname }}"
+    ocp_dir: /home/rromero/ocp/bootstrap
+  environment:
+    KUBECONFIG: "{{ ocp_dir }}/auth/kubeconfig"
+    PATH: '/usr/bin:/usr/local/bin'
+  tasks:
+
+    - name: Deprovision cluster
+      delegate_to: localhost
+      tags:
+        - never
+      block:
+
+        - name: "Force Stop Virtual Machine"
+          community.proxmox.proxmox_kvm:
+            api_host: "{{ proxmox_api_host }}"
+            api_user: "{{ proxmox_api_user | default(omit) }}"
+            api_password: "{{ proxmox_api_pass | default(omit) }}"
+            api_token_id: "{{ proxmox_token_id | default(omit) }}"
+            api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
+            vmid: "{{ vmid }}"
+            node: "{{ proxmox_node }}"
+            state: stopped
+            force: true
+          register: __proxmox_vm_results
+
+        - name: "Delete virtual machine"
+          community.proxmox.proxmox_kvm:
+            api_host: "{{ proxmox_api_host }}"
+            api_user: "{{ proxmox_api_user | default(omit) }}"
+            api_password: "{{ proxmox_api_pass | default(omit) }}"
+            api_token_id: "{{ proxmox_token_id | default(omit) }}"
+            api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
+            vmid: "{{ vmid }}"
+            node: "{{ proxmox_node }}"
+            state: absent
+
+      rescue:
+
+        - name: Print message
+          ansible.builtin.debug:
+            msg: "{{ __proxmox_vm_results['msg'] }}"
+          when:
+            - __proxmox_vm_results['msg'] is search(vmid | string)
+
+    - name: "Create new virtual machine"
+      community.proxmox.proxmox_kvm:
+        agent: 'enabled=0'
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user | default(omit) }}"
+        api_password: "{{ proxmox_api_pass | default(omit) }}"
+        api_token_id: "{{ proxmox_token_id | default(omit) }}"
+        api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
+        balloon: "{{ proxmox_balloon | default('0') }}"
+        bios: "{{ proxmox_bios | default('seabios') }}"
+        cores: "{{ proxmox_cores | default('4') }}"
+        cpu: "{{ proxmox_cpu_type | default('host') }}"
+        hotplug: "{{ proxmox_hotplug | default('network,cpu,memory,disk') }}"
+        ipconfig:
+          ipconfig0: 'ip=dhcp'
+        memory: "{{ proxmox_ram | default('16384') }}"
+        name: "{{ proxmox_vm_name | trim }}"
+        net:
+          net0: "virtio={{ proxmox_mac_address }},bridge=vmbr0,firewall=1"
+          net1: "{{ proxmox_nic2 | default(omit) }}"
+        node: "{{ proxmox_node }}"
+        numa_enabled: "{{ proxmox_numa | default('no') }}"
+        onboot: "{{ proxmox_onboot | default('no') }}"
+        ostype: "{{ proxmox_ostype | default('l26') }}"
+        protection: "{{ proxmox_protection | default(false) }}"
+        scsihw: "{{ promxox_scsihw | default('virtio-scsi-single') }}"
+        scsi:
+          scsi0: "{{ proxmox_storage }}:{{ proxmox_disk_size }}\
+            {%- if inventory_hostname in groups['workernodes'] -%}\
+            ,format=qcow2{%- endif -%}"
+        sockets: "{{ proxmox_sockets | default('1') }}"
+        startup: "{{ proxmox_startup }}"
+        storage: "{{ proxmox_storage | default('local-lvm') }}"
+        tags: "{{ proxmox_tags | list }}"
+        validate_certs: "{{ proxmox_validate_certs | default(true) }}"
+        vcpus: "{{ proxmox_vcpus | default(omit) }}"
+        vmid: "{{ proxmox_vmid | default(omit) }}"
+      register: __proxmox_results
+      delegate_to: localhost
+      retries: 3
+      until:
+        - __proxmox_results['changed'] | bool
+
+    - name: Update existing disk
+      community.proxmox.proxmox_disk:
+        aio: "{{ proxmox_aio }}"
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user | default(omit) }}"
+        api_password: "{{ proxmox_api_pass | default(omit) }}"
+        api_token_id: "{{ proxmox_token_id | default(omit) }}"
+        api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
+        discard: "{{ proxmox_disk_discard | default(omit) }}"
+        disk: scsi0
+        iothread: "{{ promxox_iothread | default(omit) }}"
+        vmid: "{{ vmid | default(omit) }}"
+      delegate_to: localhost
+      retries: 3
+
+    - name: Run ocp config block
+      delegate_to: localhost
+      run_once: true
+      block:
+
+        - name: Clean up old OCP files # noqa run-once[task]
+          ansible.builtin.file:
+            path: "{{ ocp_dir }}/{{ ocp_file }}"
+            state: absent
+          loop_control:
+            loop_var: ocp_file
+          loop:
+            - '.openshift_install_state.json'
+            - '.openshift_install.log'
+            - auth
+            - manifests
+            - openshift
+            - master.ign
+            - bootstrap.ign
+            - worker.ign
+
+        - name: Create openshift-install config file
+          ansible.builtin.copy:
+            src: "{{ ocp_dir }}/files/install-config.yaml.template"
+            dest: "{{ ocp_dir }}/install-config.yaml"
+            mode: '0644'
+            remote_src: true
+
+        - name: Create openshift manifests
+          ansible.builtin.command: "openshift-install create manifests --dir={{ ocp_dir }}"
+          args:
+            chdir: "{{ ocp_dir }}"
+          changed_when: false
+          register: __manifest_results
+
+        - name: Print __manifest_results
+          ansible.builtin.debug:
+            var: __manifest_results['stdout_lines']
+
+        - name: Copy manifest files
+          ansible.builtin.copy:
+            src: "{{ ocp_dir }}/files/{{ manifest_file }}"
+            dest: "{{ ocp_dir }}/manifests/{{ manifest_file }}"
+            mode: '0644'
+            remote_src: true
+          loop_control:
+            loop_var: manifest_file
+          loop:
+            - cluster-ingress-02-config.yaml
+            - custom-ingress-certs.yaml
+
+        - name: Create openshift ignition files
+          ansible.builtin.command: "openshift-install create ignition-configs --dir={{ ocp_dir }}"
+          changed_when: false
+          register: __ignition_results
+
+        - name: Set proper permissions so files can be read
+          ansible.builtin.file:
+            path: "{{ ocp_dir }}/{{ ocp_file }}"
+            mode: '0644'
+          loop_control:
+            loop_var: ocp_file
+          loop:
+            - master.ign
+            - bootstrap.ign
+            - worker.ign
+
+    - name: "Start Virtual Machine"
+      community.proxmox.proxmox_kvm:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user | default(omit) }}"
+        api_password: "{{ proxmox_api_pass | default(omit) }}"
+        api_token_id: "{{ proxmox_token_id | default(omit) }}"
+        api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
+        vmid: "{{ vmid }}"
+        node: "{{ proxmox_node }}"
+        state: started
+      delegate_to: localhost
+
+    - name: OCP bootstrap block # noqa run-once[task]
+      delegate_to: localhost
+      run_once: true
+      block:
+
+        - name: Kick off ocp installation
+          ansible.builtin.command: "openshift-install wait-for bootstrap-complete --dir={{ ocp_dir }}"
+          args:
+            chdir: "{{ ocp_dir }}"
+          changed_when: false
+          async: 3500
+          poll: 120
+          register: __bootstrap_results
+          until:
+            - __bootstrap_results['rc'] == 0
+
+        - name: Pause for 120 seconds to allow certs to go into pending before continuing
+          ansible.builtin.pause:
+            seconds: 120
+
+      rescue:
+
+        - name: Print failure message
+          ansible.builtin.debug:
+            msg: "OCP Bootsrap failed"
+
+    - name: "Stop Bootstrap Virtual Machine"
+      community.proxmox.proxmox_kvm:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user | default(omit) }}"
+        api_password: "{{ proxmox_api_pass | default(omit) }}"
+        api_token_id: "{{ proxmox_token_id | default(omit) }}"
+        api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
+        vmid: "{{ vmid }}"
+        node: "{{ proxmox_node }}"
+        state: stopped
+        force: true
+      delegate_to: localhost
+      when:
+        - inventory_hostname in groups['bootstrap']
+
+    - name: OCP post bootstrap block # noqa run-once[task]
+      delegate_to: localhost
+      run_once: true
+      block:
+
+        - name: Check OCP nodes
+          ansible.builtin.include_tasks:
+            file: bootstrap_ocp_get_nodes.yml
+
+        - name: Check OCP nodes
+          ansible.builtin.include_tasks:
+            file: bootstrap_ocp_approve_csr.yml
+
+        - name: Check OCP nodes again
+          ansible.builtin.include_tasks:
+            file: bootstrap_ocp_get_nodes.yml
+
+        - name: Run wait-for
+          ansible.builtin.command: "openshift-install wait-for install-complete --dir={{ ocp_dir }}"
+          changed_when: false
+          async: 3000
+          poll: 30
+          register: __install_complete
+
+      always:
+
+        - name: Print installation results
+          ansible.builtin.debug:
+            var: __install_complete['stderr_lines']
+
+...

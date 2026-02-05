@@ -1,0 +1,39 @@
+apiVersion: v1
+baseDomain: example.com
+metadata:
+# This will be the name of your cluster combined with the
+# baseDomain.  E.g. ocp.example.com
+  name: ocp
+
+controlPlane:
+  architecture: amd64
+  hyperthreading: Enabled
+  name: master
+  replicas: 3
+compute:
+- architecture: amd64
+  hyperthreading: Enabled
+  name: worker
+  replicas: 2
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  networkType: OVNKubernetes
+  serviceNetwork:
+  - 172.30.0.0/16
+platform:
+  none: {}
+pullSecret: ADD_YOUR_PULL_SECRET_FROM_CONSOLE.REDHAT.COM
+
+# Your public SSH key for debugging the nodes
+sshKey: ADD_YOUR_SSH_PUBLIC_KEY_HERE
+
+# Use your CA cert here
+additionalTrustBundle: |
+  -----BEGIN CERTIFICATE-----
+  MIIFczCCA1ugAwIBAgIQPNW8ACFYaLZMZwHITrOXsDANBgkqhkiG9w0BAQsFADBM
+  shortened_for_brevity
+  tMCVQJbGeg==
+  -----END CERTIFICATE-----
+

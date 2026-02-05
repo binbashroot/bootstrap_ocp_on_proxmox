@@ -1,0 +1,6 @@
+.vscode
+*.swp
+*.swo
+*.tar.gz
+foo*
+.ansible
