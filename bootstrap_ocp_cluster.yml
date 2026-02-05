@@ -23,7 +23,7 @@
             api_password: "{{ proxmox_api_pass | default(omit) }}"
             api_token_id: "{{ proxmox_token_id | default(omit) }}"
             api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
-            vmid: "{{ vmid }}"
+            vmid: "{{ proxmox_vmid }}"
             node: "{{ proxmox_node }}"
             state: stopped
             force: true
@@ -36,7 +36,7 @@
             api_password: "{{ proxmox_api_pass | default(omit) }}"
             api_token_id: "{{ proxmox_token_id | default(omit) }}"
             api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
-            vmid: "{{ vmid }}"
+            vmid: "{{ proxmox_vmid }}"
             node: "{{ proxmox_node }}"
             state: absent
 
@@ -46,7 +46,7 @@
           ansible.builtin.debug:
             msg: "{{ __proxmox_vm_results['msg'] }}"
           when:
-            - __proxmox_vm_results['msg'] is search(vmid | string)
+            - __proxmox_vm_results['msg'] is search(proxmox_vmid | string)
 
     - name: "Create new virtual machine"
       community.proxmox.proxmox_kvm:
@@ -60,7 +60,7 @@
         bios: "{{ proxmox_bios | default('seabios') }}"
         cores: "{{ proxmox_cores | default('4') }}"
         cpu: "{{ proxmox_cpu_type | default('host') }}"
-        hotplug: "{{ proxmox_hotplug | default('network,cpu,memory,disk') }}"
+        hotplug: "{{ proxmox_hotplug | default('network,memory,cpu,disk') }}"
         ipconfig:
           ipconfig0: 'ip=dhcp'
         memory: "{{ proxmox_ram | default('16384') }}"
@@ -102,7 +102,7 @@
         discard: "{{ proxmox_disk_discard | default(omit) }}"
         disk: scsi0
         iothread: "{{ promxox_iothread | default(omit) }}"
-        vmid: "{{ vmid | default(omit) }}"
+        vmid: "{{ proxmox_vmid | default(omit) }}"
       delegate_to: localhost
       retries: 3
 
@@ -180,7 +180,7 @@
         api_password: "{{ proxmox_api_pass | default(omit) }}"
         api_token_id: "{{ proxmox_token_id | default(omit) }}"
         api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
-        vmid: "{{ vmid }}"
+        vmid: "{{ proxmox_vmid }}"
         node: "{{ proxmox_node }}"
         state: started
       delegate_to: localhost
@@ -218,7 +218,7 @@
         api_password: "{{ proxmox_api_pass | default(omit) }}"
         api_token_id: "{{ proxmox_token_id | default(omit) }}"
         api_token_secret: "{{ proxmox_token_secret | default(omit) }}"
-        vmid: "{{ vmid }}"
+        vmid: "{{ proxmox_vmid }}"
         node: "{{ proxmox_node }}"
         state: stopped
         force: true
