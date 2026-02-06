@@ -30,10 +30,11 @@ Requirements
 | Jinja | 3.1.6 | - |
 | openshift-install | 4.21.0 | Can be downloaded from RH or the GH repository for the installer |
 | ipxe-bootimgs | 20200823 | Use: `dnf install ipxe-bootimgs-x86` to install. Contains the undionly.kpxe binary which you need on your tftp server|
+| oc | | Openshift oc binary file |
 
 DHCP
 ------------
-It's recommended to use static DHCP entries on your dhcp server.  How to set up a dhcp is not covered in this document.  Only the settings required for your DHCP server to properly serve tftp are covered.
+It's recommended to use reserved DHCP IPs on your dhcp server for your OCP hosts.  How to set up a dhcp is not covered in this document.  Only the settings required for your DHCP server to properly serve tftp are covered.
 Do yourself a favor and configure your virtual machines with static mac addresses, and assign them a static dhcp address in your router or dhcp software.
 | Code | Name | Value | Notes |
 |:---|:---|:---|:---|

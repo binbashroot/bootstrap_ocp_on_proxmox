@@ -60,7 +60,7 @@
         bios: "{{ proxmox_bios | default('seabios') }}"
         cores: "{{ proxmox_cores | default('4') }}"
         cpu: "{{ proxmox_cpu_type | default('host') }}"
-        hotplug: "{{ proxmox_hotplug | default('network,memory,cpu,disk') }}"
+        hotplug: "{{ proxmox_hotplug | default('network,cpu,disk') }}"
         ipconfig:
           ipconfig0: 'ip=dhcp'
         memory: "{{ proxmox_ram | default('16384') }}"
